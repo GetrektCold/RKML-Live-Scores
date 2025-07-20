@@ -39,6 +39,10 @@
     h1 {
       text-align: center;
       font-size: 32px;
+    }
+
+    h1 {
+      text-align: center;
       margin-bottom: 16px;
     }
 
@@ -116,7 +120,7 @@
 
   <!-- ✏️ Customize your scoreboard title -->
   <h1>RKML Live Scores</h1>
-
+  <h5>Number in parenthesis is karma rank</h5>
   <div class="loading" id="loading-indicator">Loading...</div>
   <div id="games-container"></div>
 
@@ -124,7 +128,7 @@
   <a href="index.html" class="home-link">← Home</a>
 
   <script>
-    // === 🔧 CONFIGURATION SECTION (Update these) ===
+        // === 🔧 CONFIGURATION SECTION (Update these) ===
 
     // ✏️ Link to your Google Sheets CSV for the schedule
     const scheduleCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpulPcOQfax804A13iR8RWrX5cATgGi9sHSiDlH_8cRc7Elco-g9EECC97OeuLFBurN-ze-KWhqovZ/pub?output=csv';
@@ -157,18 +161,23 @@
       });
     }
 
-    async function fetchKarma(userId) {
-      if (karmaCache.has(userId)) return karmaCache.get(userId);
-      try {
-        const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
-        const data = await res.json();
-        const val = parseFloat(data?.stats?.karmaDelta || 0);
-        karmaCache.set(userId, val);
-        return val;
-      } catch {
-        return 0;
-      }
-    }
+   async function fetchKarma(userId) {
+  if (karmaCache.has(userId)) return karmaCache.get(userId);
+  try {
+    const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
+    const data = await res.json();
+
+    const val = parseFloat(data?.stats?.karmaDelta || 0);
+    const rank = parseInt(data?.stats?.karmaDayRank || 0);
+
+    const result = { val, rank };
+    karmaCache.set(userId, result);
+    return result;
+  } catch {
+    return { val: 0, rank: 0 };
+  }
+}
+
 
     async function limitedMap(array, limit, asyncFn, onProgress) {
       const results = [];
@@ -188,31 +197,33 @@
       return results;
     }
 
-    async function processTeam(players, updateProgress) {
-      let teamTotal = 0;
-      const rows = await limitedMap(players, 10, async p => {
-        const userId = p['User ID']?.trim();
-        const userAt = p['User @']?.trim() || 'Unknown';
-        const role = (p['role'] || '').toLowerCase();
-        const deduction = parseFloat(p['deductions'] || 0);
+   async function processTeam(players, updateProgress) {
+  let teamTotal = 0;
+  const rows = await limitedMap(players, 10, async p => {
+    const userId = p['User ID']?.trim();
+    const userAt = p['User @']?.trim() || 'Unknown';
+    const role = (p['role'] || '').toLowerCase();
+    const deduction = parseFloat(p['deductions'] || 0);
 
-        if (!userId || userId.toLowerCase() === 'not found') return `${userAt}: missing`;
+    if (!userId || userId.toLowerCase() === 'not found') return `${userAt}: missing`;
 
-        const base = await fetchKarma(userId);
-        const adjusted = base - deduction;
-        const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
+    const { val: base, rank } = await fetchKarma(userId);
+    const adjusted = base - deduction;
+    const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
 
-        teamTotal += boosted;
+    teamTotal += boosted;
 
-        const rounded = Math.round(adjusted);
-        const label = role === 'captain'
-          ? `${userAt} (c): ${rounded} → ${Math.round(boosted)}`
-          : `${userAt}: ${rounded}`;
+    const rounded = Math.round(adjusted);
 
-        return `<div class="player-row">${label}</div>`;
-      }, updateProgress);
-      return { rows, total: Math.round(teamTotal) };
-    }
+    const label = role === 'captain'
+      ? `${userAt} (c): ${rounded} (${rank}) → ${Math.round(boosted)}`
+      : `${userAt}: ${rounded} (${rank})`;
+
+    return `<div class="player-row">${label}</div>`;
+  }, updateProgress);
+  return { rows, total: Math.round(teamTotal) };
+}
+
 
     function createGameHTML(team1, team2, t1Total, t2Total, t1Rows, t2Rows, index) {
       const id = `game-${index}`;
