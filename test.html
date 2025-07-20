@@ -91,7 +91,7 @@
 </head>
 <body>
   <h1>RKML Live Scores</h1>
-  <h5>Number in parenthesis is karma rank</h5>
+  <h5>Number on far right is karma rank</h5>
   <div class="loading" id="loading-indicator">Loading...</div>
   <div id="games-container"></div>
   <a href="index.html" class="home-link">← Home</a>
@@ -176,7 +176,7 @@
         } else {
           labelHtml = `<span class="player-label">${userAt}: ${rounded}</span>`;
         }
-        return `<div class="player-row">${labelHtml}<span class="karma-rank">(${rank})</span></div>`;
+        return `<div class="player-row">${labelHtml}<span class="karma-rank">${rank}</span></div>`;
       }, updateProgress);
       return { rows, total: Math.round(teamTotal) };
     }
