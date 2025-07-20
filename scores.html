@@ -3,13 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- ✏️ Update the page title to match your league name -->
   <title>RKML Live Scores</title>
-
-  <!-- Axios for making HTTP requests -->
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
   <style>
     :root {
       --bg-color: #121212;
@@ -18,14 +13,7 @@
       --text-color: #ffffff;
       --text-muted: #aaa;
     }
-
-    /* ✨ Styling for a dark theme scoreboard UI */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Roboto, sans-serif;
       background-color: var(--bg-color);
@@ -35,24 +23,14 @@
       max-width: 760px;
       margin: auto;
     }
-
-    h1 {
-      text-align: center;
-      font-size: 32px;
-    }
-
-    h5 {
-      text-align: center;
-      margin-bottom: 16px;
-    }
-
+    h1 { text-align: center; font-size: 32px; }
+    h5 { text-align: center; margin-bottom: 16px; }
     .loading {
       text-align: center;
       font-size: 14px;
       color: var(--accent-color);
       margin-bottom: 16px;
     }
-
     .home-link {
       display: block;
       text-align: center;
@@ -62,11 +40,7 @@
       text-decoration: none;
       transition: opacity 0.2s;
     }
-
-    .home-link:hover {
-      opacity: 0.7;
-    }
-
+    .home-link:hover { opacity: 0.7; }
     .game-container {
       background-color: var(--card-color);
       border-radius: 16px;
@@ -74,7 +48,6 @@
       box-shadow: 0 0 12px rgba(0, 255, 136, 0.15);
       overflow: hidden;
     }
-
     .game-header {
       padding: 16px 20px;
       background-color: #2a2a2a;
@@ -87,60 +60,46 @@
       font-size: 17px;
       transition: background 0.2s ease;
     }
-
-    .game-header:hover {
-      background-color: #353535;
-    }
-
-    .game-body {
-      display: none;
-      padding: 20px;
-    }
-
-    .team-roster {
-      margin-bottom: 24px;
-    }
-
+    .game-header:hover { background-color: #353535; }
+    .game-body { display: none; padding: 20px; }
+    .team-roster { margin-bottom: 24px; }
     .roster-title {
       font-weight: bold;
       margin-bottom: 8px;
       color: var(--text-muted);
     }
-
     .player-row {
       padding: 6px 12px;
       background-color: #333;
       border-radius: 6px;
       margin-bottom: 6px;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .player-label { /* left section */ }
+    .karma-rank {
+      margin-left: 12px;
+      color: var(--accent-color);
+      font-weight: bold;
+      min-width: 32px;
+      text-align: right;
+      flex-shrink: 0;
     }
   </style>
 </head>
 <body>
-
-  <!-- ✏️ Customize your scoreboard title -->
   <h1>RKML Live Scores</h1>
-  <h5>Number in parenthesis is karma rank</h5>
+  <h5>Number on far right is karma rank</h5>
   <div class="loading" id="loading-indicator">Loading...</div>
   <div id="games-container"></div>
-
-  <!-- ✏️ Link back to homepage -->
   <a href="index.html" class="home-link">← Home</a>
-
   <script>
-        // === 🔧 CONFIGURATION SECTION (Update these) ===
-
-    // ✏️ Link to your Google Sheets CSV for the schedule
+    // === CONFIGURATION SECTION ===
     const scheduleCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpulPcOQfax804A13iR8RWrX5cATgGi9sHSiDlH_8cRc7Elco-g9EECC97OeuLFBurN-ze-KWhqovZ/pub?output=csv';
-
-    // ✏️ Link to your Google Sheets CSV for rosters
     const rosterCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSEEzC1lcmy8r7irgTXLWUJhvEsMgN1YmwUFfAQ2wBQMNTu_L1uXQe_c-tdy9c3PJ416_wtBkyQKlbD/pub?output=csv';
-
-    // ✏️ Your Cloudflare Worker or proxy URL that fetches user karma
     const WORKER_URL = 'https://karma.messagejulian.workers.dev/';
-
-    // === 🔁 Functional logic ===
-
     const karmaCache = new Map();
 
     function getTodayString() {
@@ -161,29 +120,25 @@
       });
     }
 
-   async function fetchKarma(userId) {
-  if (karmaCache.has(userId)) return karmaCache.get(userId);
-  try {
-    const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
-    const data = await res.json();
-
-    const val = parseFloat(data?.stats?.karmaDelta || 0);
-    const rank = parseInt(data?.stats?.karmaDayRank || 0);
-
-    const result = { val, rank };
-    karmaCache.set(userId, result);
-    return result;
-  } catch {
-    return { val: 0, rank: 0 };
-  }
-}
-
+    async function fetchKarma(userId) {
+      if (karmaCache.has(userId)) return karmaCache.get(userId);
+      try {
+        const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        const val = parseFloat(data?.stats?.karmaDelta || 0);
+        const rank = parseInt(data?.stats?.karmaDayRank || 0);
+        const result = { val, rank };
+        karmaCache.set(userId, result);
+        return result;
+      } catch {
+        return { val: 0, rank: 0 };
+      }
+    }
 
     async function limitedMap(array, limit, asyncFn, onProgress) {
       const results = [];
       let index = 0;
       const executing = new Set();
-
       for (const item of array) {
         const p = asyncFn(item).then(res => {
           results.push(res);
@@ -197,33 +152,34 @@
       return results;
     }
 
-   async function processTeam(players, updateProgress) {
-  let teamTotal = 0;
-  const rows = await limitedMap(players, 10, async p => {
-    const userId = p['User ID']?.trim();
-    const userAt = p['User @']?.trim() || 'Unknown';
-    const role = (p['role'] || '').toLowerCase();
-    const deduction = parseFloat(p['deductions'] || 0);
+    async function processTeam(players, updateProgress) {
+      let teamTotal = 0;
+      const rows = await limitedMap(players, 10, async p => {
+        const userId = p['User ID']?.trim();
+        const userAt = p['User @']?.trim() || 'Unknown';
+        const role = (p['role'] || '').toLowerCase();
+        const deduction = parseFloat(p['deductions'] || 0);
 
-    if (!userId || userId.toLowerCase() === 'not found') return `${userAt}: missing`;
+        if (!userId || userId.toLowerCase() === 'not found') {
+          return `<div class="player-row"><span class="player-label">${userAt}: missing</span><span class="karma-rank"></span></div>`;
+        }
 
-    const { val: base, rank } = await fetchKarma(userId);
-    const adjusted = base - deduction;
-    const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
+        const { val: base, rank } = await fetchKarma(userId);
+        const adjusted = base - deduction;
+        const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
+        teamTotal += boosted;
+        const rounded = Math.round(adjusted);
 
-    teamTotal += boosted;
-
-    const rounded = Math.round(adjusted);
-
-    const label = role === 'captain'
-      ? `${userAt} (c): ${rounded} (${rank}) → ${Math.round(boosted)}`
-      : `${userAt}: ${rounded} (${rank})`;
-
-    return `<div class="player-row">${label}</div>`;
-  }, updateProgress);
-  return { rows, total: Math.round(teamTotal) };
-}
-
+        let labelHtml;
+        if (role === 'captain') {
+          labelHtml = `<span class="player-label">${userAt} (c): ${rounded} → ${Math.round(boosted)}</span>`;
+        } else {
+          labelHtml = `<span class="player-label">${userAt}: ${rounded}</span>`;
+        }
+        return `<div class="player-row">${labelHtml}<span class="karma-rank">${rank}</span></div>`;
+      }, updateProgress);
+      return { rows, total: Math.round(teamTotal) };
+    }
 
     function createGameHTML(team1, team2, t1Total, t2Total, t1Rows, t2Rows, index) {
       const id = `game-${index}`;
@@ -251,45 +207,35 @@
     async function loadGames() {
       const loading = document.getElementById('loading-indicator');
       const container = document.getElementById('games-container');
-
       try {
         const [scheduleRes, rosterRes] = await Promise.all([
           axios.get(scheduleCsvUrl),
           axios.get(rosterCsvUrl)
         ]);
-
         const today = getTodayString();
         const games = parseCSV(scheduleRes.data).filter(g => g.Date?.trim() === today);
         const players = parseCSV(rosterRes.data).filter(p => p['playing?']?.toLowerCase() === 'yes');
-
         let loaded = 0;
         const total = players.length;
-        const updateProgress = () => {
-          loading.textContent = `Loaded ${loaded++} out of ${total} players...`;
-        };
-
+        const updateProgress = () => { loading.textContent = `Loaded ${loaded++} out of ${total} players...`; };
         for (let i = 0; i < games.length; i++) {
           const game = games[i];
           const t1 = game['Team 1'];
           const t2 = game['Team 2'];
           const t1Players = players.filter(p => p.Team === t1);
           const t2Players = players.filter(p => p.Team === t2);
-
           const [t1Data, t2Data] = await Promise.all([
             processTeam(t1Players, updateProgress),
             processTeam(t2Players, updateProgress)
           ]);
-
           container.innerHTML += createGameHTML(t1, t2, t1Data.total, t2Data.total, t1Data.rows, t2Data.rows, i);
         }
-
         loading.textContent = 'Done.';
       } catch (e) {
         loading.textContent = 'Failed to load game data.';
         console.error(e);
       }
     }
-
     loadGames();
   </script>
 </body>
