@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RKML Yesterday Scores</title>
+  <title>RKML Yesterday Scores 2</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
   <h1>RKML Yesterday Scores</h1>
   <label>Select Date: <select id="date-select"></select></label>
-  <button type="button" onclick="initPage();">Load</button>
+  <button type="button" onclick="loadGamesForDate();">Load</button>
   <div id="games-container"></div>
 
   <script>
@@ -85,11 +85,18 @@
         </div>`;
     }
 
-    async function loadGamesForDate(date) {
+    async function loadGamesForDate() {
+      const selectedDate = document.getElementById('date-select').value;
       const container = document.getElementById('games-container');
       container.innerHTML = '<p>Loading...</p>';
+
       try {
-        const games = allGames.filter(g => g.Date?.trim() === date);
+        const [rosterRes] = await Promise.all([
+          axios.get(rosterCsvUrl)
+        ]);
+        allPlayers = parseCSV(rosterRes.data);
+
+        const games = allGames.filter(g => g.Date?.trim() === selectedDate);
         const players = allPlayers.filter(p => p['playing?']?.toLowerCase() === 'yes');
 
         let output = '';
@@ -109,31 +116,26 @@
       }
     }
 
-    async function initPage() {
-      const [scheduleRes, rosterRes] = await Promise.all([
-        axios.get(scheduleCsvUrl),
-        axios.get(rosterCsvUrl)
+    async function populateDropdown() {
+      const [scheduleRes] = await Promise.all([
+        axios.get(scheduleCsvUrl)
       ]);
       allGames = parseCSV(scheduleRes.data);
-      allPlayers = parseCSV(rosterRes.data);
 
       const dateSet = new Set(allGames.map(g => g.Date?.trim()).filter(Boolean));
       const dates = Array.from(dateSet).sort((a, b) => new Date(a) - new Date(b));
+
       const select = document.getElementById('date-select');
+      select.innerHTML = '';
       dates.forEach(d => {
         const opt = document.createElement('option');
         opt.value = d;
         opt.textContent = d;
         select.appendChild(opt);
       });
-
-      select.addEventListener('change', () => loadGamesForDate(select.value));
-      if (dates.length > 0) {
-        select.value = dates[0];
-        loadGamesForDate(dates[0]);
-      }
     }
 
+    populateDropdown();
   </script>
 </body>
 </html>
