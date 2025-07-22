@@ -3,24 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RKML Live Scores</title>
+  <title>RKML Live Scores 2</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
   <h1>RKML Live Scores</h1>
+  <label>Select Date: <select id="date-select"></select></label>
   <div id="games-container"></div>
+
   <script>
     const scheduleCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpulPcOQfax804A13iR8RWrX5cATgGi9sHSiDlH_8cRc7Elco-g9EECC97OeuLFBurN-ze-KWhqovZ/pub?output=csv';
     const rosterCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSEEzC1lcmy8r7irgTXLWUJhvEsMgN1YmwUFfAQ2wBQMNTu_L1uXQe_c-tdy9c3PJ416_wtBkyQKlbD/pub?output=csv';
     const WORKER_URL = 'https://karma.messagejulian.workers.dev/';
     const karmaCache = new Map();
 
-    function getTodayString() {
-      const now = new Date();
-      const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-      if (est.getHours() < 7) est.setDate(est.getDate() - 1);
-      return `${est.getMonth() + 1}/${est.getDate()}`;
-    }
+    let allGames = [];
+    let allPlayers = [];
 
     function parseCSV(text) {
       const lines = text.trim().split('\n');
@@ -62,14 +60,14 @@
           continue;
         }
 
-        const { val: base } = await fetchKarma(userId);
+        const { val: base, rank } = await fetchKarma(userId);
         const adjusted = base - deduction;
         const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
         teamTotal += boosted;
         const rounded = Math.round(adjusted);
         const label = role === 'captain'
-          ? `${userAt} (c): ${rounded} → ${Math.round(boosted)}`
-          : `${userAt}: ${rounded}`;
+          ? `${userAt} (c): ${rounded} (${rank}) → ${Math.round(boosted)}`
+          : `${userAt}: ${rounded} (${rank})`;
         rows.push(`<li>${label}</li>`);
       }
       return { rows, total: Math.round(teamTotal) };
@@ -86,17 +84,14 @@
         </div>`;
     }
 
-    async function loadGames() {
+    async function loadGamesForDate(date) {
       const container = document.getElementById('games-container');
+      container.innerHTML = '<p>Loading...</p>';
       try {
-        const [scheduleRes, rosterRes] = await Promise.all([
-          axios.get(scheduleCsvUrl),
-          axios.get(rosterCsvUrl)
-        ]);
-        const today = getTodayString();
-        const games = parseCSV(scheduleRes.data).filter(g => g.Date?.trim() === today);
-        const players = parseCSV(rosterRes.data).filter(p => p['playing?']?.toLowerCase() === 'yes');
+        const games = allGames.filter(g => g.Date?.trim() === date);
+        const players = allPlayers.filter(p => p['playing?']?.toLowerCase() === 'yes');
 
+        let output = '';
         for (const game of games) {
           const t1Players = players.filter(p => p.Team === game['Team 1']);
           const t2Players = players.filter(p => p.Team === game['Team 2']);
@@ -104,15 +99,41 @@
             processTeam(t1Players),
             processTeam(t2Players)
           ]);
-          container.innerHTML += createGameHTML(game['Team 1'], game['Team 2'], t1Data.total, t2Data.total, t1Data.rows, t2Data.rows);
+          output += createGameHTML(game['Team 1'], game['Team 2'], t1Data.total, t2Data.total, t1Data.rows, t2Data.rows);
         }
+        container.innerHTML = output || '<p>No games for this date.</p>';
       } catch (e) {
         container.innerHTML = '<p>Failed to load game data.</p>';
         console.error(e);
       }
     }
 
-    loadGames();
+    async function initPage() {
+      const [scheduleRes, rosterRes] = await Promise.all([
+        axios.get(scheduleCsvUrl),
+        axios.get(rosterCsvUrl)
+      ]);
+      allGames = parseCSV(scheduleRes.data);
+      allPlayers = parseCSV(rosterRes.data);
+
+      const dateSet = new Set(allGames.map(g => g.Date?.trim()).filter(Boolean));
+      const dates = Array.from(dateSet).sort((a, b) => new Date(a) - new Date(b));
+      const select = document.getElementById('date-select');
+      dates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', () => loadGamesForDate(select.value));
+      if (dates.length > 0) {
+        select.value = dates[0];
+        loadGamesForDate(dates[0]);
+      }
+    }
+
+    initPage();
   </script>
 </body>
 </html>
