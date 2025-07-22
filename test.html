@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RKML Live Scores</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <h1>RKML Live Scores</h1>
+  <div id="games-container"></div>
+  <script>
+    const scheduleCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpulPcOQfax804A13iR8RWrX5cATgGi9sHSiDlH_8cRc7Elco-g9EECC97OeuLFBurN-ze-KWhqovZ/pub?output=csv';
+    const rosterCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSEEzC1lcmy8r7irgTXLWUJhvEsMgN1YmwUFfAQ2wBQMNTu_L1uXQe_c-tdy9c3PJ416_wtBkyQKlbD/pub?output=csv';
+    const WORKER_URL = 'https://karma.messagejulian.workers.dev/';
+    const karmaCache = new Map();
+
+    function getTodayString() {
+      const now = new Date();
+      const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      if (est.getHours() < 7) est.setDate(est.getDate() - 1);
+      return `${est.getMonth() + 1}/${est.getDate()}`;
+    }
+
+    function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = line.split(',').map(p => p.trim());
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]);
+        return obj;
+      });
+    }
+
+    async function fetchKarma(userId) {
+      if (karmaCache.has(userId)) return karmaCache.get(userId);
+      try {
+        const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        const val = parseFloat(data?.stats?.karmaDelta || 0);
+        const rank = parseInt(data?.stats?.karmaDayRank || 0);
+        const result = { val, rank };
+        karmaCache.set(userId, result);
+        return result;
+      } catch {
+        return { val: 0, rank: 0 };
+      }
+    }
+
+    async function processTeam(players) {
+      let teamTotal = 0;
+      const rows = [];
+      for (const p of players) {
+        const userId = p['User ID']?.trim();
+        const userAt = p['User @']?.trim() || 'Unknown';
+        const role = (p['role'] || '').toLowerCase();
+        const deduction = parseFloat(p['deductions'] || 0);
+
+        if (!userId || userId.toLowerCase() === 'not found') {
+          rows.push(`<li>${userAt}: missing</li>`);
+          continue;
+        }
+
+        const { val: base } = await fetchKarma(userId);
+        const adjusted = base - deduction;
+        const boosted = role === 'captain' ? adjusted * 1.5 : adjusted;
+        teamTotal += boosted;
+        const rounded = Math.round(adjusted);
+        const label = role === 'captain'
+          ? `${userAt} (c): ${rounded} → ${Math.round(boosted)}`
+          : `${userAt}: ${rounded}`;
+        rows.push(`<li>${label}</li>`);
+      }
+      return { rows, total: Math.round(teamTotal) };
+    }
+
+    function createGameHTML(team1, team2, t1Total, t2Total, t1Rows, t2Rows) {
+      return `
+        <div>
+          <p><strong>${team1} (${t1Total})</strong></p>
+          <ul>${t1Rows.join('')}</ul>
+          <p><strong>${team2} (${t2Total})</strong></p>
+          <ul>${t2Rows.join('')}</ul>
+          <hr>
+        </div>`;
+    }
+
+    async function loadGames() {
+      const container = document.getElementById('games-container');
+      try {
+        const [scheduleRes, rosterRes] = await Promise.all([
+          axios.get(scheduleCsvUrl),
+          axios.get(rosterCsvUrl)
+        ]);
+        const today = getTodayString();
+        const games = parseCSV(scheduleRes.data).filter(g => g.Date?.trim() === today);
+        const players = parseCSV(rosterRes.data).filter(p => p['playing?']?.toLowerCase() === 'yes');
+
+        for (const game of games) {
+          const t1Players = players.filter(p => p.Team === game['Team 1']);
+          const t2Players = players.filter(p => p.Team === game['Team 2']);
+          const [t1Data, t2Data] = await Promise.all([
+            processTeam(t1Players),
+            processTeam(t2Players)
+          ]);
+          container.innerHTML += createGameHTML(game['Team 1'], game['Team 2'], t1Data.total, t2Data.total, t1Data.rows, t2Data.rows);
+        }
+      } catch (e) {
+        container.innerHTML = '<p>Failed to load game data.</p>';
+        console.error(e);
+      }
+    }
+
+    loadGames();
+  </script>
+</body>
+</html>
