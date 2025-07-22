@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RKML Live Scores 2</title>
+  <title>RKML Yesterday Scores</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
-  <h1>RKML Live Scores</h1>
+  <h1>RKML Yesterday Scores</h1>
   <label>Select Date: <select id="date-select"></select></label>
   <div id="games-container"></div>
 
@@ -36,8 +36,8 @@
       try {
         const res = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
-        const val = parseFloat(data?.stats?.karmaDelta || 0);
-        const rank = parseInt(data?.stats?.karmaDayRank || 0);
+        const val = parseFloat(data?.stats?.karmaYesterdayDelta || 0);
+        const rank = parseInt(data?.stats?.karmaYesterdayRank || 0);
         const result = { val, rank };
         karmaCache.set(userId, result);
         return result;
