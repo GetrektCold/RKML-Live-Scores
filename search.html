@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFL Hype Bulk Scanner</title>
+    <title>NFL Hype Bulk Scanner 2</title>
     <style>
         * {
             margin: 0;
@@ -336,7 +336,7 @@
         </div>
 
         <div class="note">
-            <strong>How it works:</strong> This scanner fetches the user data from the provided Google Sheets CSV, then uses Cloudflare proxy to scan each user's content for the specific NFL hype phrase. Results are categorized and can be filtered for easy review.
+            <strong>How it works:</strong> This scanner fetches the user data from the provided Google Sheets CSV, then makes real API calls to your Cloudflare Worker at <code>https://rkl-worker.tommyek600.workers.dev/</code> to scan each user's content for the specific NFL hype phrase. The system searches through all user items and entities for exact phrase matches.
         </div>
     </div>
 
@@ -424,46 +424,117 @@
             for (let i = 0; i < userData.length; i++) {
                 const user = userData[i];
                 const progress = ((i + 1) / userData.length) * 100;
+                const userId = user['User ID'] || '';
 
                 // Update progress bar
                 progressFill.style.width = `${progress}%`;
                 progressText.textContent = `Scanning ${user['User @'] || 'Unknown'} (${i + 1}/${userData.length})`;
 
-                // Simulate scanning delay
-                await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-
-                // Determine if user should be flagged (simulation logic)
-                let found = false;
-                let context = 'No matches found in user content';
-
-                // Higher chance for active players to have NFL content
-                const isActive = user['playing?'] === 'yes';
-                const username = user['User @'] || '';
-                const userId = user['User ID'] || '';
-
-                // Simulation logic for finding NFL content
-                if (isActive && Math.random() > 0.6) {
-                    found = true;
-                    context = 'Found in recent posts';
-                } else if (username.toLowerCase().includes('nfl') || 
-                          username.toLowerCase().includes('football') ||
-                          username.toLowerCase().includes('sports')) {
-                    found = true;
-                    context = 'Found in user profile';
-                } else if (Math.random() > 0.85) {
-                    found = true;
-                    context = 'Found in user activity';
+                // Skip users without valid User ID
+                if (!userId || userId === 'NOT FOUND' || userId === 'Not Found') {
+                    scanResults[userId || `unknown_${i}`] = {
+                        user: user,
+                        found: false,
+                        phrase: targetPhrase,
+                        context: 'Invalid or missing User ID',
+                        timestamp: new Date().toISOString(),
+                        proxyUsed: false,
+                        error: 'No valid User ID'
+                    };
+                    continue;
                 }
 
-                // Store scan result
-                scanResults[userId] = {
-                    user: user,
+                try {
+                    // Make real API call to Cloudflare Worker
+                    const result = await scanUserContent(userId, targetPhrase);
+                    
+                    // Store scan result
+                    scanResults[userId] = {
+                        user: user,
+                        found: result.found,
+                        phrase: targetPhrase,
+                        context: result.context,
+                        foundInItem: result.foundInItem,
+                        timestamp: new Date().toISOString(),
+                        proxyUsed: true,
+                        apiResponse: result.apiResponse
+                    };
+
+                } catch (error) {
+                    console.error(`Error scanning user ${userId}:`, error);
+                    
+                    // Store error result
+                    scanResults[userId] = {
+                        user: user,
+                        found: false,
+                        phrase: targetPhrase,
+                        context: `API Error: ${error.message}`,
+                        timestamp: new Date().toISOString(),
+                        proxyUsed: false,
+                        error: error.message
+                    };
+                }
+
+                // Add delay to respect rate limits
+                await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+            }
+        }
+
+        async function scanUserContent(userId, targetPhrase) {
+            const WORKER_URL = 'https://rkl-worker.tommyek600.workers.dev/';
+            
+            try {
+                // Make request to Cloudflare Worker
+                const response = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // Search through the items for the target phrase
+                let found = false;
+                let context = 'No matches found in user content';
+                let foundInItem = null;
+
+                if (data.items && Array.isArray(data.items)) {
+                    for (const item of data.items) {
+                        if (item.entities && Array.isArray(item.entities)) {
+                            for (const entity of item.entities) {
+                                if (entity.display && entity.display.includes(targetPhrase)) {
+                                    found = true;
+                                    context = `Found in item ${item.id} (${item.type} type) - "${entity.display}"`;
+                                    foundInItem = item.id;
+                                    break;
+                                }
+                            }
+                        }
+                        if (found) break;
+                    }
+                    
+                    if (!found) {
+                        context = `Scanned ${data.items.length} items - no matches found`;
+                    }
+                } else {
+                    context = 'No items found in user data';
+                }
+
+                return {
                     found: found,
-                    phrase: targetPhrase,
                     context: context,
-                    timestamp: new Date().toISOString(),
-                    proxyUsed: true
+                    foundInItem: foundInItem,
+                    apiResponse: data
                 };
+
+            } catch (error) {
+                throw new Error(`Failed to fetch user data: ${error.message}`);
             }
         }
 
@@ -510,7 +581,11 @@
                             <div><strong>Active:</strong> ${user['playing?'] === 'yes' ? '✅ Yes' : '❌ No'}</div>
                             <div><strong>User ID:</strong> ${user['User ID'] || 'N/A'}</div>
                         </div>
-                        ${result.found ? `<div style="margin-top: 10px; font-size: 0.9em; color: #c62828;"><strong>Context:</strong> ${result.context}</div>` : ''}
+                        <div style="margin-top: 10px; font-size: 0.9em; color: ${result.found ? '#c62828' : '#666'};">
+                            <strong>Scan Result:</strong> ${result.context}
+                            ${result.error ? `<br><span style="color: #ff9800;"><strong>Error:</strong> ${result.error}</span>` : ''}
+                            ${result.foundInItem ? `<br><strong>Item ID:</strong> ${result.foundInItem}` : ''}
+                        </div>
                     </div>
                 `;
             }).join('');
