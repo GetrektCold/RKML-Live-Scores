@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFL Hype Bulk Scanner 2</title>
+    <title>NFL Hype Bulk Scanner</title>
     <style>
         * {
             margin: 0;
@@ -282,7 +282,13 @@
         <p class="subtitle">Automatically scan all users from CSV for NFL hype content</p>
         
         <div class="search-phrase">
-            <strong>Searching for:</strong> "Got hyped for the 2025-26 NFL season 👏"
+            <strong>Searching for:</strong> 
+            <div style="margin-top: 8px;">
+                1. "Got hyped for the 2025-26 NFL season 👏"
+            </div>
+            <div style="margin-top: 4px;">
+                2. "referral 📈" (any username + referral 📈)
+            </div>
         </div>
 
         <div class="controls">
@@ -419,42 +425,54 @@
         async function scanAllUsers() {
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
-            const targetPhrase = "Got hyped for the 2025-26 NFL season 👏";
+            const searchPhrases = [
+                "Got hyped for the 2025-26 NFL season 👏",
+                "referral 📈"
+            ];
+            const CONCURRENT_REQUESTS = 10;
 
-            for (let i = 0; i < userData.length; i++) {
-                const user = userData[i];
-                const progress = ((i + 1) / userData.length) * 100;
-                const userId = user['User ID'] || '';
+            let completedCount = 0;
+            let totalUsers = userData.length;
 
-                // Update progress bar
+            // Function to update progress
+            const updateProgress = () => {
+                const progress = (completedCount / totalUsers) * 100;
                 progressFill.style.width = `${progress}%`;
-                progressText.textContent = `Scanning ${user['User @'] || 'Unknown'} (${i + 1}/${userData.length})`;
+                progressText.textContent = `Scanning users... (${completedCount}/${totalUsers} completed)`;
+            };
+
+            // Function to scan a single user
+            const scanSingleUser = async (user, index) => {
+                const userId = user['User ID'] || '';
 
                 // Skip users without valid User ID
                 if (!userId || userId === 'NOT FOUND' || userId === 'Not Found') {
-                    scanResults[userId || `unknown_${i}`] = {
+                    scanResults[userId || `unknown_${index}`] = {
                         user: user,
                         found: false,
-                        phrase: targetPhrase,
+                        phrases: searchPhrases,
                         context: 'Invalid or missing User ID',
                         timestamp: new Date().toISOString(),
                         proxyUsed: false,
                         error: 'No valid User ID'
                     };
-                    continue;
+                    completedCount++;
+                    updateProgress();
+                    return;
                 }
 
                 try {
                     // Make real API call to Cloudflare Worker
-                    const result = await scanUserContent(userId, targetPhrase);
+                    const result = await scanUserContent(userId, searchPhrases);
                     
                     // Store scan result
                     scanResults[userId] = {
                         user: user,
                         found: result.found,
-                        phrase: targetPhrase,
+                        phrases: searchPhrases,
                         context: result.context,
                         foundInItem: result.foundInItem,
+                        foundPhrases: result.foundPhrases,
                         timestamp: new Date().toISOString(),
                         proxyUsed: true,
                         apiResponse: result.apiResponse
@@ -467,7 +485,7 @@
                     scanResults[userId] = {
                         user: user,
                         found: false,
-                        phrase: targetPhrase,
+                        phrases: searchPhrases,
                         context: `API Error: ${error.message}`,
                         timestamp: new Date().toISOString(),
                         proxyUsed: false,
@@ -475,12 +493,28 @@
                     };
                 }
 
-                // Add delay to respect rate limits
-                await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+                completedCount++;
+                updateProgress();
+            };
+
+            // Process users in batches of CONCURRENT_REQUESTS
+            for (let i = 0; i < userData.length; i += CONCURRENT_REQUESTS) {
+                const batch = userData.slice(i, i + CONCURRENT_REQUESTS);
+                const batchPromises = batch.map((user, batchIndex) => 
+                    scanSingleUser(user, i + batchIndex)
+                );
+
+                // Wait for current batch to complete before starting next batch
+                await Promise.all(batchPromises);
+
+                // Small delay between batches to be respectful to the API
+                if (i + CONCURRENT_REQUESTS < userData.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
             }
         }
 
-        async function scanUserContent(userId, targetPhrase) {
+        async function scanUserContent(userId, searchPhrases) {
             const WORKER_URL = 'https://rkl-worker.tommyek600.workers.dev/';
             
             try {
@@ -499,27 +533,51 @@
 
                 const data = await response.json();
                 
-                // Search through the items for the target phrase
+                // Search through the items for any of the target phrases
                 let found = false;
                 let context = 'No matches found in user content';
                 let foundInItem = null;
+                let foundPhrases = [];
 
                 if (data.items && Array.isArray(data.items)) {
                     for (const item of data.items) {
                         if (item.entities && Array.isArray(item.entities)) {
                             for (const entity of item.entities) {
-                                if (entity.display && entity.display.includes(targetPhrase)) {
-                                    found = true;
-                                    context = `Found in item ${item.id} (${item.type} type) - "${entity.display}"`;
-                                    foundInItem = item.id;
-                                    break;
+                                if (entity.display) {
+                                    // Check for each search phrase
+                                    for (const phrase of searchPhrases) {
+                                        let phraseFound = false;
+                                        
+                                        if (phrase === "referral 📈") {
+                                            // For referral, search for the pattern regardless of username
+                                            phraseFound = entity.display.includes("referral 📈");
+                                        } else {
+                                            // For other phrases, exact match
+                                            phraseFound = entity.display.includes(phrase);
+                                        }
+                                        
+                                        if (phraseFound) {
+                                            found = true;
+                                            foundPhrases.push({
+                                                phrase: phrase,
+                                                fullText: entity.display,
+                                                itemId: item.id,
+                                                itemType: item.type
+                                            });
+                                            foundInItem = item.id;
+                                        }
+                                    }
                                 }
                             }
                         }
-                        if (found) break;
                     }
                     
-                    if (!found) {
+                    if (found) {
+                        const phraseTypes = [...new Set(foundPhrases.map(fp => 
+                            fp.phrase === "referral 📈" ? "referral" : "NFL hype"
+                        ))];
+                        context = `Found ${foundPhrases.length} match(es) for: ${phraseTypes.join(", ")} - in ${foundPhrases.length} item(s)`;
+                    } else {
                         context = `Scanned ${data.items.length} items - no matches found`;
                     }
                 } else {
@@ -530,6 +588,7 @@
                     found: found,
                     context: context,
                     foundInItem: foundInItem,
+                    foundPhrases: foundPhrases,
                     apiResponse: data
                 };
 
@@ -585,6 +644,11 @@
                             <strong>Scan Result:</strong> ${result.context}
                             ${result.error ? `<br><span style="color: #ff9800;"><strong>Error:</strong> ${result.error}</span>` : ''}
                             ${result.foundInItem ? `<br><strong>Item ID:</strong> ${result.foundInItem}` : ''}
+                            ${result.foundPhrases && result.foundPhrases.length > 0 ? 
+                                `<br><strong>Found Content:</strong><br>${result.foundPhrases.map(fp => 
+                                    `<span style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; display: inline-block; margin: 2px 0; font-size: 0.85em;">"${fp.fullText}"</span>`
+                                ).join('<br>')}` : ''
+                            }
                         </div>
                     </div>
                 `;
