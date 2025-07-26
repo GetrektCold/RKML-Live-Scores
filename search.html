@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFL Hype Bulk Scanner</title>
+    <title>NFL</title>
     <style>
         * {
             margin: 0;
@@ -295,6 +295,9 @@
             <button class="scan-btn" onclick="startBulkScan()">
                 🚀 Start Bulk Scan
             </button>
+            <button class="scan-btn" onclick="testAPI()" style="background: linear-gradient(45deg, #4CAF50, #45a049); margin-left: 10px;">
+                🧪 Test API
+            </button>
             <div id="csvStatus" style="color: #666;"></div>
         </div>
 
@@ -342,7 +345,7 @@
         </div>
 
         <div class="note">
-            <strong>How it works:</strong> This scanner fetches the user data from the provided Google Sheets CSV, then makes real API calls to your Cloudflare Worker at <code>https://rkl-worker.tommyek600.workers.dev/</code> to scan each user's content for the specific NFL hype phrase. The system searches through all user items and entities for exact phrase matches.
+            <strong>How it works:</strong> This scanner fetches the user data from the provided Google Sheets CSV, then makes real API calls to your Cloudflare Worker at <code>https://rkl-worker.tommyek600.workers.dev/</code> to scan each user's content for both target phrases. The system searches through all user items and entities, looking for exact matches for the NFL phrase and pattern matches for referral content (any @username + "referral 📈").
         </div>
     </div>
 
@@ -518,13 +521,15 @@
             const WORKER_URL = 'https://rkl-worker.tommyek600.workers.dev/';
             
             try {
-                // Make request to Cloudflare Worker
+                // Make request to Cloudflare Worker with additional options for CORS
                 const response = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`, {
                     method: 'GET',
+                    mode: 'cors',
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    credentials: 'omit'
                 });
 
                 if (!response.ok) {
@@ -593,6 +598,13 @@
                 };
 
             } catch (error) {
+                // More detailed error logging
+                console.error(`Fetch error for user ${userId}:`, {
+                    message: error.message,
+                    name: error.name,
+                    stack: error.stack
+                });
+                
                 throw new Error(`Failed to fetch user data: ${error.message}`);
             }
         }
@@ -663,6 +675,25 @@
             event.target.classList.add('active');
             
             displayResults();
+        }
+
+        // Test API function
+        async function testAPI() {
+            const testUserId = 'Gv1Ajxrv'; // Known working user ID from your example
+            const csvStatus = document.getElementById('csvStatus');
+            
+            csvStatus.textContent = '🧪 Testing API connection...';
+            csvStatus.style.color = '#2196F3';
+            
+            try {
+                const result = await scanUserContent(testUserId, ["Got hyped for the 2025-26 NFL season 👏", "referral 📈"]);
+                csvStatus.innerHTML = `✅ API Test Successful!<br>Found: ${result.found ? 'Yes' : 'No'}<br>Context: ${result.context}`;
+                csvStatus.style.color = '#4CAF50';
+            } catch (error) {
+                csvStatus.innerHTML = `❌ API Test Failed:<br>${error.message}<br><br>Troubleshooting:<br>1. Check if your Cloudflare Worker has CORS headers<br>2. Try opening <a href="https://rkl-worker.tommyek600.workers.dev/?userId=Gv1Ajxrv" target="_blank">this URL</a> directly<br>3. Check browser console for more details`;
+                csvStatus.style.color = '#f44336';
+                console.error('API Test Error:', error);
+            }
         }
 
         // Load CSV data on page load
