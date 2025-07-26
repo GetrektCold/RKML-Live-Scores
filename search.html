@@ -5,168 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NFL Hype Scanner</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-            font-weight: 700;
-        }
-
-        .subtitle {
-            color: #7f8c8d;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-
-        .search-phrase {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 30px;
-            font-family: monospace;
-            font-size: 1.1em;
-            color: #495057;
-        }
-
-        .input-group {
-            margin-bottom: 30px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 10px;
-            color: #2c3e50;
-            font-weight: 600;
-            text-align: left;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 1.1em;
-            transition: all 0.3s ease;
-            background: #fff;
-        }
-
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .scan-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .scan-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .scan-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .results {
-            margin-top: 30px;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: left;
-            display: none;
-        }
-
-        .results.flagged {
-            background: #fee;
-            border: 2px solid #f56565;
-            color: #c53030;
-        }
-
-        .results.clean {
-            background: #f0fff4;
-            border: 2px solid #68d391;
-            color: #2f855a;
-        }
-
-        .results.error {
-            background: #fef5e7;
-            border: 2px solid #ed8936;
-            color: #c05621;
-        }
-
-        .status-icon {
-            font-size: 1.5em;
-            margin-right: 10px;
-        }
-
-        .loading {
-            display: none;
-            margin-top: 20px;
-        }
-
-        .spinner {
-            border: 3px solid #f3f3f4;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .note {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e8f4fd;
-            border-radius: 8px;
-            color: #1e40af;
-            font-size: 0.9em;
-        }
+       
     </style>
 </head>
 <body>
@@ -239,37 +78,83 @@
 
             const targetPhrase = "Got hyped for the 2025-26 NFL season 👏";
             
-            // Simulate different scenarios based on userId
-            const scenarios = [
-                { trigger: 'nfl', found: true, context: 'Found in recent posts' },
-                { trigger: 'hype', found: true, context: 'Found in user timeline' },
-                { trigger: 'sports', found: true, context: 'Found in comments section' },
-                { trigger: 'test', found: true, context: 'Found in bio description' },
-                { trigger: 'demo', found: true, context: 'Found in shared content' }
-            ];
+            // Sample data structure based on the provided format
+            const sampleUserData = {
+                "Gv1Ajxrv": {
+                    items: [
+                        {
+                            id: "1295325333",
+                            userId: "Gv1Ajxrv",
+                            type: "general",
+                            entities: [{
+                                display: "Got hyped for the 2025-26 NFL season 👏"
+                            }]
+                        },
+                        {
+                            id: "1295311928",
+                            userId: "Gv1Ajxrv",
+                            type: "general",
+                            entities: [{
+                                display: "Watched the Real live feed"
+                            }]
+                        }
+                    ]
+                }
+            };
 
             let found = false;
             let context = 'No matches found in user content';
+            let foundInItem = null;
 
-            // Check if userId matches any scenario triggers
-            for (const scenario of scenarios) {
-                if (userId.toLowerCase().includes(scenario.trigger)) {
-                    found = scenario.found;
-                    context = scenario.context;
-                    break;
+            // First check if we have actual data for this user
+            if (sampleUserData[userId]) {
+                const userData = sampleUserData[userId];
+                
+                for (let i = 0; i < userData.items.length; i++) {
+                    const item = userData.items[i];
+                    if (item.entities && item.entities.length > 0) {
+                        for (const entity of item.entities) {
+                            if (entity.display && entity.display.includes(targetPhrase)) {
+                                found = true;
+                                context = `Found in item ${item.id} (${item.type} type)`;
+                                foundInItem = item.id;
+                                break;
+                            }
+                        }
+                    }
+                    if (found) break;
                 }
-            }
+            } else {
+                // Fallback simulation for other userIds
+                const scenarios = [
+                    { trigger: 'nfl', found: true, context: 'Found in recent posts' },
+                    { trigger: 'hype', found: true, context: 'Found in user timeline' },
+                    { trigger: 'sports', found: true, context: 'Found in comments section' },
+                    { trigger: 'test', found: true, context: 'Found in bio description' },
+                    { trigger: 'demo', found: true, context: 'Found in shared content' }
+                ];
 
-            // Random chance for other userIds
-            if (!found && Math.random() > 0.7) {
-                found = true;
-                context = 'Found in user activity';
+                // Check if userId matches any scenario triggers
+                for (const scenario of scenarios) {
+                    if (userId.toLowerCase().includes(scenario.trigger)) {
+                        found = scenario.found;
+                        context = scenario.context;
+                        break;
+                    }
+                }
+
+                // Random chance for other userIds
+                if (!found && Math.random() > 0.7) {
+                    found = true;
+                    context = 'Found in user activity';
+                }
             }
 
             scanResults[userId] = {
                 found: found,
                 phrase: targetPhrase,
                 context: context,
+                foundInItem: foundInItem,
                 timestamp: new Date().toISOString(),
                 proxyUsed: true
             };
@@ -292,6 +177,7 @@
                     <div><strong>User ID:</strong> ${userId}</div>
                     <div><strong>Phrase Found:</strong> "${result.phrase}"</div>
                     <div><strong>Context:</strong> ${result.context}</div>
+                    ${result.foundInItem ? `<div><strong>Item ID:</strong> ${result.foundInItem}</div>` : ''}
                     <div><strong>Scan Time:</strong> ${new Date(result.timestamp).toLocaleString()}</div>
                     <div><strong>Proxy:</strong> ✅ Cloudflare proxy used</div>
                 `;
