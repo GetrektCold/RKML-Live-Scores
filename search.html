@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFL</title>
+    <title>NFL Hype Bulk Scanner</title>
     <style>
         * {
             margin: 0;
@@ -521,15 +521,12 @@
             const WORKER_URL = 'https://rkl-worker.tommyek600.workers.dev/';
             
             try {
-                // Make request to Cloudflare Worker with additional options for CORS
+                // Make request to Cloudflare Worker without Content-Type header to avoid CORS preflight
                 const response = await fetch(`${WORKER_URL}?userId=${encodeURIComponent(userId)}`, {
                     method: 'GET',
                     mode: 'cors',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
                     credentials: 'omit'
+                    // Removed headers that trigger CORS preflight
                 });
 
                 if (!response.ok) {
